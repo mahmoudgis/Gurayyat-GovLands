@@ -66,8 +66,8 @@
     <!-- شاشة التحميل -->
     <div id="loading-screen">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
-        <h2 class="text-xl font-bold text-slate-700" id="loading-text">جاري الاتصال بقاعدة البيانات...</h2>
-        <p class="text-sm text-slate-500 mt-2">يرجى الانتظار قليلاً</p>
+        <h2 class="text-xl font-bold text-slate-700" id="loading-text">جاري الاتصال بالبيانات المكانية...</h2>
+        <p class="text-sm text-slate-500 mt-2">يتم تحميل الخرائط</p>
     </div>
 
     <!-- رسالة تنبيه -->
@@ -93,14 +93,14 @@
         <!-- المحتوى -->
         <div class="flex-1 overflow-y-auto p-4 space-y-6">
 
-            <!-- رسالة خطأ بسيطة (تظهر فقط عند فشل الاتصال الحقيقي) -->
-            <div id="error-msg" class="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm hidden">
-                <h3 class="text-sm font-bold text-red-800 mb-1 flex items-center gap-2">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                    تنبيه النظام
+            <!-- رسالة حالة النظام (تظهر في حال وجود مشكلة أو وضع معاينة) -->
+            <div id="system-msg" class="bg-blue-50 p-4 rounded-xl border border-blue-200 shadow-sm hidden">
+                <h3 class="text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-info-circle"></i>
+                    حالة النظام
                 </h3>
-                <p class="text-xs text-red-600">
-                    تعذر الوصول لملفات البيانات. يرجى التحقق من رفع الملفات الصحيحة (lands.geojson) في المستودع.
+                <p class="text-xs text-blue-600 mb-3 leading-relaxed" id="system-msg-text">
+                    جاري التحقق...
                 </p>
             </div>
 
@@ -246,26 +246,34 @@
                 // نجاح التحميل (بيئة GitHub)
                 showToast(`تم تحميل البيانات بنجاح`, "success");
                 document.getElementById('data-status').innerHTML = '<span class="text-green-600 font-bold"><i class="fa-solid fa-check"></i> متصل بالخادم (Live)</span>';
-                document.getElementById('error-msg').classList.add('hidden');
+                document.getElementById('system-msg').classList.add('hidden');
 
                 // جلب باقي الملفات بشكل صامت
                 try { const uRes = await fetch(FILES.urban); if(uRes.ok) urbanData = await uRes.json(); } catch(e) {}
                 try { const dRes = await fetch(FILES.dev); if(dRes.ok) devData = await dRes.json(); } catch(e) {}
 
             } catch (error) {
-                // التعامل الذكي مع الأخطاء (للتمييز بين بيئة المعاينة والسيرفر الحقيقي)
+                // التعامل مع الأخطاء (للتمييز بين بيئة المعاينة والسيرفر الحقيقي)
+                const errorText = error.message || "";
                 
-                if (error.message && (error.message.includes("Failed to parse URL") || error.message.includes("NetworkError"))) {
-                    // هذا الخطأ يظهر فقط في بيئة المعاينة أو التشغيل المحلي بدون سيرفر
-                    console.warn("بيئة المعاينة: لا يمكن قراءة الملفات النسبية. ستعمل عند الرفع على GitHub.");
-                    document.getElementById('data-status').innerHTML = '<span class="text-orange-500 font-bold"><i class="fa-solid fa-server"></i> بانتظار السيرفر (GitHub)</span>';
-                    showToast(`تنبيه: البيانات ستظهر عند الرفع على GitHub`, "info");
+                // التحقق مما إذا كان الخطأ بسبب بيئة المعاينة (Canvas/Blob URL)
+                const isPreviewError = errorText.includes("Failed to parse URL") || errorText.includes("NetworkError");
+
+                const msgBox = document.getElementById('system-msg');
+                const msgText = document.getElementById('system-msg-text');
+                msgBox.classList.remove('hidden');
+
+                if (isPreviewError) {
+                    // رسالة مطمئنة في وضع المعاينة
+                    // نستخدم console.warn بدلاً من console.error حتى لا يظهر باللون الأحمر المخيف
+                    console.warn("بيئة المعاينة: لا يمكن جلب الملفات النسبية. هذا متوقع وسيعمل عند الرفع.");
+                    msgText.innerHTML = "<b>تنبيه المعاينة:</b> لا يمكن قراءة الملفات في وضع المعاينة المباشرة.<br>عند الرفع على GitHub سيعمل التطبيق تلقائياً ويجلب البيانات.";
+                    document.getElementById('data-status').innerHTML = '<span class="text-orange-500 font-bold"><i class="fa-solid fa-flask"></i> وضع المعاينة</span>';
                 } else {
                     // خطأ حقيقي (مثل الملف غير موجود 404)
                     console.error("فشل التحميل من المستودع:", error);
-                    showToast(`خطأ في الاتصال بقاعدة البيانات`, "warning");
-                    document.getElementById('data-status').innerHTML = '<span class="text-red-500 font-bold"><i class="fa-solid fa-xmark"></i> فشل الاتصال</span>';
-                    document.getElementById('error-msg').classList.remove('hidden');
+                    msgText.innerHTML = `<span class="text-red-600 font-bold">خطأ:</span> لم يتم العثور على ملف <b>lands.geojson</b>.<br>تأكد من وجوده بجانب ملف index.html في المستودع.`;
+                    document.getElementById('data-status').innerHTML = '<span class="text-red-500 font-bold"><i class="fa-solid fa-xmark"></i> خطأ اتصال</span>';
                 }
                 
             } finally {
