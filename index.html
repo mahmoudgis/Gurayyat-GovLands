@@ -20,7 +20,7 @@
         #loading-screen {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.98);
             z-index: 9999;
             display: flex;
             justify-content: center;
@@ -66,8 +66,8 @@
     <!-- شاشة التحميل -->
     <div id="loading-screen">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
-        <h2 class="text-xl font-bold text-slate-700" id="loading-text">جاري تحميل بيانات القريات...</h2>
-        <p class="text-sm text-slate-500 mt-2">يتم معالجة طبقة الأراضي الحكومية</p>
+        <h2 class="text-xl font-bold text-slate-700" id="loading-text">جاري الاتصال بالبيانات المكانية...</h2>
+        <p class="text-sm text-slate-500 mt-2">يرجى الانتظار قليلاً</p>
     </div>
 
     <!-- رسالة تنبيه -->
@@ -92,6 +92,17 @@
 
         <!-- المحتوى -->
         <div class="flex-1 overflow-y-auto p-4 space-y-6">
+
+            <!-- رسالة خطأ (تظهر فقط عند فشل تحميل الملفات) -->
+            <div id="error-section" class="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm hidden">
+                <h3 class="text-sm font-bold text-red-800 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-xmark"></i>
+                    تعذر تحميل البيانات
+                </h3>
+                <p class="text-xs text-red-600 mb-3 leading-relaxed">
+                    لم نتمكن من العثور على ملف <b>lands.geojson</b>. تأكد من رفعه بجانب ملف الصفحة، وأن الاسم مطابق تماماً (أحرف صغيرة).
+                </p>
+            </div>
 
             <!-- بطاقة الفلترة -->
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
@@ -162,7 +173,7 @@
             
              <!-- حالة البيانات -->
              <div id="data-status" class="p-3 bg-gray-100 rounded text-xs text-gray-500 text-center">
-                يتم عرض بيانات القريات
+                جاري الاتصال...
             </div>
         </div>
 
@@ -185,62 +196,14 @@
         // ==========================================
         // 1. إعدادات البيانات (القريات)
         // ==========================================
-        
+        // تأكد أن أسماء ملفاتك المرفوعة تطابق هذه الأسماء بالضبط
         const FILES = {
-            lands: 'lands.geojson', 
-            urban: 'urban.geojson', 
-            dev: 'dev.geojson'
+            lands: 'lands.geojson',   // الملف الأساسي
+            urban: 'urban.geojson',   
+            dev: 'dev.geojson'        
         };
 
-        // تحويل البيانات الجدولية للقريات إلى GeoJSON
-        const MOCK_DATA_GURAYYAT = {
-            "type": "FeatureCollection",
-            "features": [
-                { "type": "Feature", "properties": { "الجهة": "وزارة النقل", "الاستخدام": "مرفق حكومي", "حالة البناء": "شاغرة", "المساحة": "8811" }, "geometry": { "type": "Point", "coordinates": [37.306297, 31.371012] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة النقل", "الاستخدام": "مرفق حكومي", "حالة البناء": "شاغرة", "المساحة": "8844" }, "geometry": { "type": "Point", "coordinates": [37.334818, 31.364396] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الموارد البشرية", "الاستخدام": "ارض الوحدة التعاونية", "حالة البناء": "شاغرة", "المساحة": "3633" }, "geometry": { "type": "Point", "coordinates": [37.328631, 31.348481] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة العدل", "الاستخدام": "مرفق حكومي", "حالة البناء": "شاغرة", "المساحة": "8787" }, "geometry": { "type": "Point", "coordinates": [37.296755, 31.367373] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة العدل", "الاستخدام": "ارض الدوائر الشرعية", "حالة البناء": "شاغرة", "المساحة": "9974" }, "geometry": { "type": "Point", "coordinates": [37.337003, 31.316915] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الطاقة", "الاستخدام": "مبني ادارة الكهرباء", "حالة البناء": "شاغرة", "المساحة": "9983" }, "geometry": { "type": "Point", "coordinates": [37.318692, 31.325588] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الصحة", "الاستخدام": "مستوصف صحي", "حالة البناء": "شاغرة", "المساحة": "8975" }, "geometry": { "type": "Point", "coordinates": [37.33116, 31.325248] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الصحة", "الاستخدام": "الهلال الأحمر", "حالة البناء": "شاغرة", "المساحة": "18698" }, "geometry": { "type": "Point", "coordinates": [37.2952, 31.365413] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الصحة", "الاستخدام": "مستشفى نساء وولادة", "حالة البناء": "شاغرة", "المساحة": "165463" }, "geometry": { "type": "Point", "coordinates": [37.303843, 31.390277] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الشؤون الإسلامية", "الاستخدام": "مرفق حكومي", "حالة البناء": "شاغرة", "المساحة": "1999" }, "geometry": { "type": "Point", "coordinates": [37.299286, 31.380984] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الداخلية", "الاستخدام": "مركز شرطة", "حالة البناء": "شاغرة", "المساحة": "915" }, "geometry": { "type": "Point", "coordinates": [37.364388, 31.323015] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الداخلية", "الاستخدام": "دفاع مدنى", "حالة البناء": "شاغرة", "المساحة": "8984" }, "geometry": { "type": "Point", "coordinates": [37.334809, 31.302427] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الداخلية", "الاستخدام": "إدارة الجوازات", "حالة البناء": "شاغرة", "المساحة": "10763" }, "geometry": { "type": "Point", "coordinates": [37.300931, 31.367517] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة التعليم", "الاستخدام": "مدرسة ابتدائية بنين", "حالة البناء": "شاغرة", "المساحة": "6400" }, "geometry": { "type": "Point", "coordinates": [37.333649, 31.297356] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة التعليم", "الاستخدام": "مدرسة ثانوية بنات", "حالة البناء": "شاغرة", "المساحة": "14383" }, "geometry": { "type": "Point", "coordinates": [37.337248, 31.300899] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة التعليم", "الاستخدام": "كلية بنات", "حالة البناء": "شاغرة", "المساحة": "102501" }, "geometry": { "type": "Point", "coordinates": [37.309134, 31.383719] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة التعليم", "الاستخدام": "ملاعب رياضية", "حالة البناء": "شاغرة", "المساحة": "199999" }, "geometry": { "type": "Point", "coordinates": [37.400784, 31.295367] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة البيئة والمياه", "الاستخدام": "المياة", "حالة البناء": "شاغرة", "المساحة": "15475" }, "geometry": { "type": "Point", "coordinates": [37.299023, 31.366744] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة البيئة والمياه", "الاستخدام": "محطة ضخ مجارى", "حالة البناء": "شاغرة", "المساحة": "2543" }, "geometry": { "type": "Point", "coordinates": [37.341372, 31.34861] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الإعلام", "الاستخدام": "مبني التليفزيون", "حالة البناء": "شاغرة", "المساحة": "11288" }, "geometry": { "type": "Point", "coordinates": [37.326454, 31.325507] } },
-                { "type": "Feature", "properties": { "الجهة": "البريد السعودي", "الاستخدام": "مكتب بريد محلي", "حالة البناء": "شاغرة", "المساحة": "564" }, "geometry": { "type": "Point", "coordinates": [37.36365, 31.32354] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الرياضة", "الاستخدام": "رعاية شباب", "حالة البناء": "شاغرة", "المساحة": "19584" }, "geometry": { "type": "Point", "coordinates": [37.341545, 31.305306] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة الداخلية", "الاستخدام": "مكافحة المخدرات", "حالة البناء": "شاغرة", "المساحة": "14975" }, "geometry": { "type": "Point", "coordinates": [37.306709, 31.380499] } },
-                { "type": "Feature", "properties": { "الجهة": "وزارة التعليم", "الاستخدام": "مرفق تعليمي عالي", "حالة البناء": "شاغرة", "المساحة": "75036" }, "geometry": { "type": "Point", "coordinates": [37.296608, 31.387899] } }
-            ]
-        };
-
-        // حدود النطاق العمراني التقريبية للقريات (بيانات وهمية للعرض)
-        const MOCK_URBAN = {
-            "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature", "properties": {"Type": "Phase 1"},
-                "geometry": { "type": "Polygon", "coordinates": [[[37.25, 31.28], [37.40, 31.28], [37.40, 31.40], [37.25, 31.40], [37.25, 31.28]]] }
-            }]
-        };
-
-        // حدود التنمية التقريبية للقريات
-        const MOCK_DEV = {
-            "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature", "properties": {"Type": "Future"},
-                "geometry": { "type": "Polygon", "coordinates": [[[37.20, 31.25], [37.45, 31.25], [37.45, 31.45], [37.20, 31.45], [37.20, 31.25]]] }
-            }]
-        };
-
+        // المتغيرات لحفظ البيانات عند تحميلها
         let landsData = null; 
         let urbanData = null;
         let devData = null;
@@ -269,33 +232,52 @@
         };
 
         // ==========================================
-        // 3. المنطق الذكي: تحميل البيانات
+        // 3. المنطق الأساسي: تحميل البيانات الخارجية فقط
         // ==========================================
 
         async function init() {
             try {
+                // 1. جلب ملف الأراضي
                 const response = await fetch(FILES.lands);
-                if (response.ok) {
-                    landsData = await response.json();
-                    showToast(`تم تحميل ملف ${FILES.lands} بنجاح`, "success");
-                    document.getElementById('data-status').innerHTML = '<span class="text-green-600 font-bold"><i class="fa-solid fa-check"></i> بيانات حقيقية (Live)</span>';
-                } else { throw new Error("File not found"); }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                landsData = await response.json();
+                
+                // نجاح التحميل
+                showToast(`تم تحميل البيانات بنجاح`, "success");
+                document.getElementById('data-status').innerHTML = '<span class="text-green-600 font-bold"><i class="fa-solid fa-check"></i> متصل بالخادم (Live)</span>';
+                document.getElementById('error-section').classList.add('hidden');
 
-                try { const uRes = await fetch(FILES.urban); if(uRes.ok) urbanData = await uRes.json(); } catch(e) {}
-                try { const dRes = await fetch(FILES.dev); if(dRes.ok) devData = await dRes.json(); } catch(e) {}
+                // 2. محاولة جلب باقي الملفات (بدون إيقاف التطبيق لو فشلت)
+                try { 
+                    const uRes = await fetch(FILES.urban); 
+                    if(uRes.ok) urbanData = await uRes.json(); 
+                } catch(e) { console.log("لا يوجد ملف نطاق عمراني"); }
+
+                try { 
+                    const dRes = await fetch(FILES.dev); 
+                    if(dRes.ok) devData = await dRes.json(); 
+                } catch(e) { console.log("لا يوجد ملف حدود تنمية"); }
 
             } catch (error) {
-                console.warn("استخدام بيانات القريات المدمجة");
-                landsData = MOCK_DATA_GURAYYAT;
-                urbanData = MOCK_URBAN;
-                devData = MOCK_DEV;
+                // في حالة الفشل: إظهار رسالة خطأ واضحة بدلاً من البيانات الوهمية
+                console.error("فشل التحميل:", error);
                 
-                showToast(`نعرض بيانات القريات التجريبية`, "warning");
+                showToast(`خطأ في تحميل ملف البيانات الرئيسي`, "warning");
+                document.getElementById('data-status').innerHTML = '<span class="text-red-500 font-bold"><i class="fa-solid fa-xmark"></i> خطأ في الاتصال</span>';
+                document.getElementById('error-section').classList.remove('hidden'); // إظهار صندوق الخطأ للمستخدم
+                
             } finally {
+                // رسم ما تم تحميله
                 renderLayers();
                 populateAttributes();
-                updateCount(landsData.features.length);
                 
+                if(landsData) {
+                    updateCount(landsData.features.length);
+                }
+                
+                // إخفاء شاشة التحميل
                 document.getElementById('loading-screen').style.opacity = '0';
                 setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; }, 500);
             }
@@ -306,12 +288,15 @@
         // ==========================================
 
         function renderLayers() {
+            // رسم الأراضي
             if(landsData) {
+                layers.lands.clearLayers();
+                
                 L.geoJSON(landsData, {
-                    // تحويل النقاط إلى دوائر (CircleMarkers)
+                    // تحويل النقاط إلى دوائر
                     pointToLayer: function (feature, latlng) {
                         return L.circleMarker(latlng, {
-                            radius: 8,
+                            radius: 6,
                             fillColor: "#2563eb",
                             color: "#fff",
                             weight: 1,
@@ -322,12 +307,14 @@
                     onEachFeature: (feature, layer) => {
                         let content = `
                             <div class="bg-blue-600 text-white p-3 font-bold text-sm flex justify-between items-center">
-                                <span>بيانات الأرض الحكومية</span>
-                                <i class="fa-solid fa-circle-info opacity-75"></i>
+                                <span>البيانات الوصفية</span>
                             </div>
                             <div class="p-3 bg-white text-sm max-h-60 overflow-y-auto">
                         `;
                         for (const [key, val] of Object.entries(feature.properties)) {
+                            // تجاهل الحقول التقنية الخاصة بـ GIS لو أردت
+                            if(key === 'OBJECTID' || key === 'Shape_Length' || key === 'Shape_Area') continue;
+                            
                             content += `
                                 <div class="flex justify-between py-1.5 border-b border-gray-100 last:border-0 hover:bg-gray-50">
                                     <span class="text-gray-500 font-medium ml-2">${key}</span>
@@ -339,10 +326,22 @@
                         layer.bindPopup(content);
                     }
                 }).addTo(layers.lands);
+                
+                // تحريك الكاميرا لحدود البيانات
+                try {
+                    const bounds = L.geoJSON(landsData).getBounds();
+                    if (bounds.isValid()) map.fitBounds(bounds);
+                } catch(e) {}
             }
 
-            if(urbanData) L.geoJSON(urbanData, { style: styles.urban }).addTo(layers.urban);
-            if(devData) L.geoJSON(devData, { style: styles.dev }).addTo(layers.dev);
+            if(urbanData) {
+                layers.urban.clearLayers();
+                L.geoJSON(urbanData, { style: styles.urban }).addTo(layers.urban);
+            }
+            if(devData) {
+                layers.dev.clearLayers();
+                L.geoJSON(devData, { style: styles.dev }).addTo(layers.dev);
+            }
         }
 
         window.toggleLayer = (layerName, isChecked) => {
@@ -354,14 +353,19 @@
             const attrSelect = document.getElementById('filterAttribute');
             attrSelect.innerHTML = '<option value="">-- اختر الحقل للتصنيف --</option>';
 
-            if (!landsData || landsData.features.length === 0) return;
+            if (!landsData || !landsData.features || landsData.features.length === 0) return;
 
+            // استخراج الحقول من أول عنصر
             const keys = Object.keys(landsData.features[0].properties);
-            keys.forEach(key => {
-                const opt = document.createElement('option');
-                opt.value = key;
-                opt.innerText = key;
-                attrSelect.appendChild(opt);
+            
+            // ترتيب الحقول واستبعاد غير المهم منها
+            keys.sort().forEach(key => {
+                 if(key !== 'OBJECTID' && key !== 'Shape' && key !== 'GlobalID') {
+                    const opt = document.createElement('option');
+                    opt.value = key;
+                    opt.innerText = key;
+                    attrSelect.appendChild(opt);
+                 }
             });
         }
 
@@ -378,7 +382,9 @@
 
             const uniqueValues = new Set();
             landsData.features.forEach(f => {
-                uniqueValues.add(f.properties[attr]);
+                if (f.properties[attr] !== undefined && f.properties[attr] !== null) {
+                    uniqueValues.add(f.properties[attr]);
+                }
             });
             
             const sortedValues = Array.from(uniqueValues).sort();
@@ -402,13 +408,14 @@
             const filtered = landsData.features.filter(f => {
                 if (!attr) return true;
                 if (val === "") return true;
-                return String(f.properties[attr]) === val;
+                // مقارنة مرنة (تحويل لنصوص)
+                return String(f.properties[attr]) === String(val); 
             });
 
             L.geoJSON({ type: "FeatureCollection", features: filtered }, {
                 pointToLayer: function (feature, latlng) {
                     return L.circleMarker(latlng, {
-                        radius: 8,
+                        radius: 6,
                         fillColor: "#2563eb",
                         color: "#fff",
                         weight: 1,
@@ -417,8 +424,10 @@
                     });
                 },
                 onEachFeature: (feature, layer) => {
-                     let content = `<div class="bg-blue-600 text-white p-3 font-bold text-sm">نتيجة البحث</div><div class="p-3 bg-white text-sm">`;
+                    // نفس كود النافذة المنبثقة
+                     let content = `<div class="bg-blue-600 text-white p-3 font-bold text-sm">نتيجة البحث</div><div class="p-3 bg-white text-sm max-h-60 overflow-y-auto">`;
                     for (const [key, v] of Object.entries(feature.properties)) {
+                        if(key === 'OBJECTID' || key === 'Shape_Length' || key === 'Shape_Area') continue;
                         content += `<div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-500">${key}</span><span class="text-gray-800 font-bold">${v}</span></div>`;
                     }
                     content += `</div>`;
@@ -457,6 +466,7 @@
             }, 5000);
         }
 
+        // بدء التشغيل
         init();
 
     </script>
