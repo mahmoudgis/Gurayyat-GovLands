@@ -59,6 +59,12 @@
             animation: fadeIn 0.3s ease-in-out;
         }
         @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+        /* تأثيرات حركية لصفوف الفلتر */
+        .filter-row {
+            animation: slideIn 0.2s ease-out;
+        }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="bg-gray-50 h-screen flex flex-col md:flex-row overflow-hidden">
@@ -66,8 +72,8 @@
     <!-- شاشة التحميل -->
     <div id="loading-screen">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
-        <h2 class="text-xl font-bold text-slate-700" id="loading-text">جاري الاتصال بالبيانات المكانية...</h2>
-        <p class="text-sm text-slate-500 mt-2">يتم تحميل الخرائط</p>
+        <h2 class="text-xl font-bold text-slate-700" id="loading-text">جاري الاتصال بقاعدة البيانات...</h2>
+        <p class="text-sm text-slate-500 mt-2">يرجى الانتظار قليلاً</p>
     </div>
 
     <!-- رسالة تنبيه -->
@@ -93,7 +99,7 @@
         <!-- المحتوى -->
         <div class="flex-1 overflow-y-auto p-4 space-y-6">
 
-            <!-- رسالة حالة النظام (تظهر في حال وجود مشكلة أو وضع معاينة) -->
+            <!-- رسالة حالة النظام -->
             <div id="system-msg" class="bg-blue-50 p-4 rounded-xl border border-blue-200 shadow-sm hidden">
                 <h3 class="text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
                     <i class="fa-solid fa-info-circle"></i>
@@ -104,37 +110,30 @@
                 </p>
             </div>
 
-            <!-- بطاقة الفلترة -->
+            <!-- بطاقة الفلترة المتقدمة -->
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2">
-                    <i class="fa-solid fa-filter text-blue-600"></i>
-                    تصفية الأراضي الحكومية
-                </h3>
-
-                <div class="space-y-4">
-                    <div>
-                        <label class="text-xs font-bold text-slate-500 block mb-1">تصنيف حسب</label>
-                        <select id="filterAttribute" class="w-full bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 transition">
-                            <option value="">جاري تحميل البيانات...</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="text-xs font-bold text-slate-500 block mb-1">القيمة</label>
-                        <select id="filterValue" disabled class="w-full bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 disabled:opacity-50 transition">
-                            <option value="">الكل</option>
-                        </select>
-                    </div>
-
-                    <div class="flex gap-2 pt-2">
-                        <button id="applyBtn" class="flex-1 text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition shadow-lg shadow-blue-500/30 active:scale-95">تطبيق</button>
-                        <button id="resetBtn" class="text-slate-700 bg-slate-100 hover:bg-slate-200 font-medium rounded-lg text-sm px-4 py-2.5 transition active:scale-95" title="إعادة تعيين"><i class="fa-solid fa-rotate-right"></i></button>
-                    </div>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                        <i class="fa-solid fa-filter text-blue-600"></i>
+                        تصفية متقدمة
+                    </h3>
+                    <button id="addFilterBtn" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-bold transition flex items-center gap-1 border border-blue-100">
+                        <i class="fa-solid fa-plus"></i> إضافة معيار
+                    </button>
                 </div>
 
-                <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-                    <span class="text-slate-500">النتائج المعروضة:</span>
-                    <span id="countBadge" class="bg-blue-100 text-blue-800 font-bold px-2.5 py-0.5 rounded border border-blue-200">0 أرض</span>
+                <!-- حاوية الفلاتر -->
+                <div id="filters-container" class="space-y-3">
+                    <!-- سيتم إضافة صفوف الفلترة هنا ديناميكياً -->
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
+                    <div class="text-xs text-slate-500">
+                        النتائج: <span id="countBadge" class="bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded border border-blue-200 mx-1">0</span> أرض
+                    </div>
+                    <button id="resetBtn" class="text-xs text-slate-500 hover:text-red-600 underline transition">
+                        مسح الكل
+                    </button>
                 </div>
             </div>
 
@@ -194,7 +193,7 @@
 
     <script>
         // ==========================================
-        // 1. إعدادات البيانات (القريات)
+        // 1. إعدادات البيانات
         // ==========================================
         const FILES = {
             lands: 'lands.geojson',   
@@ -202,7 +201,6 @@
             dev: 'dev.geojson'        
         };
 
-        // المتغيرات لحفظ البيانات عند تحميلها
         let landsData = null; 
         let urbanData = null;
         let devData = null;
@@ -211,7 +209,6 @@
         // 2. إعداد الخريطة
         // ==========================================
         
-        // تعديل الزووم على القريات (31.33, 37.34)
         const map = L.map('map', {zoomControl: false}).setView([31.33, 37.34], 12);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -231,55 +228,46 @@
         };
 
         // ==========================================
-        // 3. المنطق الأساسي: تحميل البيانات
+        // 3. المنطق الأساسي والتهيئة
         // ==========================================
 
         async function init() {
             try {
-                // محاولة جلب ملف الأراضي
                 const response = await fetch(FILES.lands);
-                if (!response.ok) {
-                    throw new Error(`HTTP Error: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
                 landsData = await response.json();
                 
-                // نجاح التحميل (بيئة GitHub)
                 showToast(`تم تحميل البيانات بنجاح`, "success");
                 document.getElementById('data-status').innerHTML = '<span class="text-green-600 font-bold"><i class="fa-solid fa-check"></i> متصل بالخادم (Live)</span>';
                 document.getElementById('system-msg').classList.add('hidden');
 
-                // جلب باقي الملفات بشكل صامت
                 try { const uRes = await fetch(FILES.urban); if(uRes.ok) urbanData = await uRes.json(); } catch(e) {}
                 try { const dRes = await fetch(FILES.dev); if(dRes.ok) devData = await dRes.json(); } catch(e) {}
 
             } catch (error) {
-                // التعامل مع الأخطاء (للتمييز بين بيئة المعاينة والسيرفر الحقيقي)
                 const errorText = error.message || "";
-                
-                // التحقق مما إذا كان الخطأ بسبب بيئة المعاينة (Canvas/Blob URL)
                 const isPreviewError = errorText.includes("Failed to parse URL") || errorText.includes("NetworkError");
-
                 const msgBox = document.getElementById('system-msg');
                 const msgText = document.getElementById('system-msg-text');
                 msgBox.classList.remove('hidden');
 
                 if (isPreviewError) {
-                    // رسالة مطمئنة في وضع المعاينة
-                    // نستخدم console.warn بدلاً من console.error حتى لا يظهر باللون الأحمر المخيف
-                    console.warn("بيئة المعاينة: لا يمكن جلب الملفات النسبية. هذا متوقع وسيعمل عند الرفع.");
-                    msgText.innerHTML = "<b>تنبيه المعاينة:</b> لا يمكن قراءة الملفات في وضع المعاينة المباشرة.<br>عند الرفع على GitHub سيعمل التطبيق تلقائياً ويجلب البيانات.";
+                    console.warn("وضع المعاينة: سيتم جلب البيانات عند الرفع.");
+                    msgText.innerHTML = "<b>تنبيه المعاينة:</b> لا يمكن قراءة الملفات محلياً. ستعمل تلقائياً عند الرفع على GitHub.";
                     document.getElementById('data-status').innerHTML = '<span class="text-orange-500 font-bold"><i class="fa-solid fa-flask"></i> وضع المعاينة</span>';
                 } else {
-                    // خطأ حقيقي (مثل الملف غير موجود 404)
-                    console.error("فشل التحميل من المستودع:", error);
-                    msgText.innerHTML = `<span class="text-red-600 font-bold">خطأ:</span> لم يتم العثور على ملف <b>lands.geojson</b>.<br>تأكد من وجوده بجانب ملف index.html في المستودع.`;
+                    console.error("خطأ:", error);
+                    msgText.innerHTML = `<span class="text-red-600 font-bold">خطأ:</span> لم يتم العثور على <b>lands.geojson</b>.`;
                     document.getElementById('data-status').innerHTML = '<span class="text-red-500 font-bold"><i class="fa-solid fa-xmark"></i> خطأ اتصال</span>';
                 }
-                
             } finally {
                 renderLayers();
-                populateAttributes();
-                if(landsData) updateCount(landsData.features.length);
+                
+                // تهيئة الفلاتر: إضافة صف واحد افتراضي
+                if (landsData) {
+                    addFilterRow();
+                    updateCount(landsData.features.length);
+                }
                 
                 document.getElementById('loading-screen').style.opacity = '0';
                 setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; }, 500);
@@ -287,45 +275,171 @@
         }
 
         // ==========================================
-        // 4. وظائف العرض والتحكم
+        // 4. منطق الفلترة المتقدمة (متعددة المعايير)
+        // ==========================================
+
+        const filtersContainer = document.getElementById('filters-container');
+
+        // إضافة صف فلتر جديد
+        function addFilterRow() {
+            if (!landsData || !landsData.features.length) return;
+
+            const rowId = 'filter-row-' + Date.now();
+            const row = document.createElement('div');
+            row.className = 'filter-row flex gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-200';
+            row.id = rowId;
+
+            row.innerHTML = `
+                <div class="flex-1">
+                    <select class="filter-attr w-full bg-white border border-slate-300 text-slate-700 text-xs rounded focus:ring-blue-500 focus:border-blue-500 p-2" onchange="handleAttrChange('${rowId}')">
+                        <option value="">-- اختر الحقل --</option>
+                    </select>
+                </div>
+                <div class="flex-1">
+                    <select class="filter-val w-full bg-white border border-slate-300 text-slate-700 text-xs rounded focus:ring-blue-500 focus:border-blue-500 p-2 disabled:bg-slate-100 disabled:text-slate-400" disabled onchange="applyMultiFilters()">
+                        <option value="">-- الكل --</option>
+                    </select>
+                </div>
+                <button onclick="removeFilterRow('${rowId}')" class="text-slate-400 hover:text-red-500 transition px-1" title="حذف">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            `;
+
+            filtersContainer.appendChild(row);
+            populateAttributes(row.querySelector('.filter-attr'));
+        }
+
+        // حذف صف فلتر
+        window.removeFilterRow = function(rowId) {
+            const row = document.getElementById(rowId);
+            if(row) {
+                row.remove();
+                applyMultiFilters(); // إعادة تطبيق الفلاتر المتبقية
+            }
+            // إذا لم يبق أي فلتر، أضف واحداً فارغاً
+            if (filtersContainer.children.length === 0) {
+                addFilterRow();
+            }
+        };
+
+        // زر إضافة معيار
+        document.getElementById('addFilterBtn').addEventListener('click', addFilterRow);
+
+        // زر مسح الكل
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            filtersContainer.innerHTML = '';
+            addFilterRow();
+            applyMultiFilters();
+        });
+
+        // تعبئة قائمة الحقول (Attributes)
+        function populateAttributes(selectElement) {
+            const keys = Object.keys(landsData.features[0].properties);
+            keys.sort().forEach(key => {
+                 if(key !== 'OBJECTID' && key !== 'Shape' && key !== 'GlobalID' && key !== 'Shape_Length' && key !== 'Shape_Area') {
+                    const opt = document.createElement('option');
+                    opt.value = key;
+                    opt.innerText = key;
+                    selectElement.appendChild(opt);
+                 }
+            });
+        }
+
+        // عند تغيير الحقل -> تعبئة القيم المتاحة
+        window.handleAttrChange = function(rowId) {
+            const row = document.getElementById(rowId);
+            const attrSelect = row.querySelector('.filter-attr');
+            const valSelect = row.querySelector('.filter-val');
+            const attr = attrSelect.value;
+
+            valSelect.innerHTML = '<option value="">-- الكل --</option>';
+            
+            if (!attr) {
+                valSelect.disabled = true;
+                applyMultiFilters(); // تحديث الخريطة
+                return;
+            }
+            valSelect.disabled = false;
+
+            // استخراج القيم الفريدة لهذا الحقل
+            const uniqueValues = new Set();
+            landsData.features.forEach(f => {
+                if (f.properties[attr] !== undefined && f.properties[attr] !== null) {
+                    uniqueValues.add(f.properties[attr]);
+                }
+            });
+            
+            const sortedValues = Array.from(uniqueValues).sort();
+            sortedValues.forEach(val => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.innerText = val;
+                valSelect.appendChild(opt);
+            });
+            
+            // تطبيق الفلتر فوراً (سيعتبر القيمة "الكل" حالياً)
+            applyMultiFilters();
+        };
+
+        // الدالة الرئيسية: تطبيق جميع الفلاتر (AND Logic)
+        window.applyMultiFilters = function() {
+            if (!landsData) return;
+
+            // جمع كل معايير الفلترة الحالية
+            const criteria = [];
+            const rows = filtersContainer.querySelectorAll('.filter-row');
+            
+            rows.forEach(row => {
+                const attr = row.querySelector('.filter-attr').value;
+                const val = row.querySelector('.filter-val').value;
+                if (attr && val !== "") {
+                    criteria.push({ attr: attr, val: val });
+                }
+            });
+
+            // تصفية البيانات
+            const filteredFeatures = landsData.features.filter(feature => {
+                // يجب أن يحقق العنصر *جميع* الشروط (AND)
+                return criteria.every(criterion => {
+                    return String(feature.properties[criterion.attr]) === String(criterion.val);
+                });
+            });
+
+            // رسم النتائج
+            layers.lands.clearLayers();
+            L.geoJSON({ type: "FeatureCollection", features: filteredFeatures }, {
+                pointToLayer: function (feature, latlng) {
+                    return L.circleMarker(latlng, {
+                        radius: 6,
+                        fillColor: "#2563eb",
+                        color: "#fff",
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                },
+                onEachFeature: (feature, layer) => {
+                     let content = `<div class="bg-blue-600 text-white p-3 font-bold text-sm">بيانات الأرض</div><div class="p-3 bg-white text-sm max-h-60 overflow-y-auto">`;
+                    for (const [key, v] of Object.entries(feature.properties)) {
+                        if(key === 'OBJECTID' || key === 'Shape_Length' || key === 'Shape_Area') continue;
+                        content += `<div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-500">${key}</span><span class="text-gray-800 font-bold">${v}</span></div>`;
+                    }
+                    content += `</div>`;
+                    layer.bindPopup(content);
+                }
+            }).addTo(layers.lands);
+
+            updateCount(filteredFeatures.length);
+        };
+
+        // ==========================================
+        // 5. وظائف مساعدة والعرض
         // ==========================================
 
         function renderLayers() {
             if(landsData) {
-                layers.lands.clearLayers();
-                
-                L.geoJSON(landsData, {
-                    pointToLayer: function (feature, latlng) {
-                        return L.circleMarker(latlng, {
-                            radius: 6,
-                            fillColor: "#2563eb",
-                            color: "#fff",
-                            weight: 1,
-                            opacity: 1,
-                            fillOpacity: 0.8
-                        });
-                    },
-                    onEachFeature: (feature, layer) => {
-                        let content = `
-                            <div class="bg-blue-600 text-white p-3 font-bold text-sm flex justify-between items-center">
-                                <span>البيانات الوصفية</span>
-                            </div>
-                            <div class="p-3 bg-white text-sm max-h-60 overflow-y-auto">
-                        `;
-                        for (const [key, val] of Object.entries(feature.properties)) {
-                            if(key === 'OBJECTID' || key === 'Shape_Length' || key === 'Shape_Area') continue;
-                            content += `
-                                <div class="flex justify-between py-1.5 border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                                    <span class="text-gray-500 font-medium ml-2">${key}</span>
-                                    <span class="text-gray-800 font-bold text-left" dir="ltr">${val}</span>
-                                </div>
-                            `;
-                        }
-                        content += `</div>`;
-                        layer.bindPopup(content);
-                    }
-                }).addTo(layers.lands);
-                
+                // رسم مبدئي (سيتم تحديثه بواسطة الفلتر)
+                applyMultiFilters(); 
                 try {
                     const bounds = L.geoJSON(landsData).getBounds();
                     if (bounds.isValid()) map.fitBounds(bounds);
@@ -347,103 +461,8 @@
             else map.removeLayer(layers[layerName]);
         };
 
-        function populateAttributes() {
-            const attrSelect = document.getElementById('filterAttribute');
-            attrSelect.innerHTML = '<option value="">-- اختر الحقل للتصنيف --</option>';
-
-            if (!landsData || !landsData.features || landsData.features.length === 0) return;
-
-            const keys = Object.keys(landsData.features[0].properties);
-            
-            keys.sort().forEach(key => {
-                 if(key !== 'OBJECTID' && key !== 'Shape' && key !== 'GlobalID') {
-                    const opt = document.createElement('option');
-                    opt.value = key;
-                    opt.innerText = key;
-                    attrSelect.appendChild(opt);
-                 }
-            });
-        }
-
-        document.getElementById('filterAttribute').addEventListener('change', (e) => {
-            const attr = e.target.value;
-            const valSelect = document.getElementById('filterValue');
-            valSelect.innerHTML = '<option value="">-- الكل --</option>';
-            
-            if (!attr) {
-                valSelect.disabled = true;
-                return;
-            }
-            valSelect.disabled = false;
-
-            const uniqueValues = new Set();
-            landsData.features.forEach(f => {
-                if (f.properties[attr] !== undefined && f.properties[attr] !== null) {
-                    uniqueValues.add(f.properties[attr]);
-                }
-            });
-            
-            const sortedValues = Array.from(uniqueValues).sort();
-
-            sortedValues.forEach(val => {
-                const opt = document.createElement('option');
-                opt.value = val;
-                opt.innerText = val;
-                valSelect.appendChild(opt);
-            });
-        });
-
-        document.getElementById('applyBtn').addEventListener('click', () => {
-            const attr = document.getElementById('filterAttribute').value;
-            const val = document.getElementById('filterValue').value;
-
-            if(!landsData) return;
-
-            layers.lands.clearLayers();
-
-            const filtered = landsData.features.filter(f => {
-                if (!attr) return true;
-                if (val === "") return true;
-                return String(f.properties[attr]) === String(val); 
-            });
-
-            L.geoJSON({ type: "FeatureCollection", features: filtered }, {
-                pointToLayer: function (feature, latlng) {
-                    return L.circleMarker(latlng, {
-                        radius: 6,
-                        fillColor: "#2563eb",
-                        color: "#fff",
-                        weight: 1,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    });
-                },
-                onEachFeature: (feature, layer) => {
-                     let content = `<div class="bg-blue-600 text-white p-3 font-bold text-sm">نتيجة البحث</div><div class="p-3 bg-white text-sm max-h-60 overflow-y-auto">`;
-                    for (const [key, v] of Object.entries(feature.properties)) {
-                        if(key === 'OBJECTID' || key === 'Shape_Length' || key === 'Shape_Area') continue;
-                        content += `<div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-500">${key}</span><span class="text-gray-800 font-bold">${v}</span></div>`;
-                    }
-                    content += `</div>`;
-                    layer.bindPopup(content);
-                }
-            }).addTo(layers.lands);
-
-            updateCount(filtered.length);
-        });
-
-        document.getElementById('resetBtn').addEventListener('click', () => {
-            document.getElementById('filterAttribute').value = "";
-            document.getElementById('filterValue').innerHTML = '<option value="">الكل</option>';
-            document.getElementById('filterValue').disabled = true;
-            
-            layers.lands.clearLayers();
-            renderLayers(); 
-            updateCount(landsData.features.length);
-        });
-
         function updateCount(num) {
-            document.getElementById('countBadge').innerText = num + " أرض";
+            document.getElementById('countBadge').innerText = num;
         }
 
         function showToast(msg, type = 'info') {
@@ -460,7 +479,6 @@
             }, 5000);
         }
 
-        // بدء التشغيل
         init();
 
     </script>
