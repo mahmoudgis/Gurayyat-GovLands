@@ -66,7 +66,7 @@
     <!-- شاشة التحميل -->
     <div id="loading-screen">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
-        <h2 class="text-xl font-bold text-slate-700" id="loading-text">جاري الاتصال بالبيانات المكانية...</h2>
+        <h2 class="text-xl font-bold text-slate-700" id="loading-text">جاري الاتصال بقاعدة البيانات...</h2>
         <p class="text-sm text-slate-500 mt-2">يرجى الانتظار قليلاً</p>
     </div>
 
@@ -93,28 +93,15 @@
         <!-- المحتوى -->
         <div class="flex-1 overflow-y-auto p-4 space-y-6">
 
-            <!-- رسالة خطأ + رفع يدوي (تظهر فقط عند فشل تحميل الملفات) -->
-            <div id="error-section" class="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm hidden">
-                <h3 class="text-sm font-bold text-red-800 mb-2 flex items-center gap-2">
-                    <i class="fa-solid fa-circle-xmark"></i>
-                    تنبيه: تعذر جلب البيانات تلقائياً
+            <!-- رسالة خطأ بسيطة (تظهر فقط عند فشل الاتصال الحقيقي) -->
+            <div id="error-msg" class="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm hidden">
+                <h3 class="text-sm font-bold text-red-800 mb-1 flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    تنبيه النظام
                 </h3>
-                <p class="text-xs text-red-600 mb-3 leading-relaxed">
-                    تأكد أن ملف <b>lands.geojson</b> مرفوع بنفس الاسم (حروف صغيرة).<br>
-                    <b>الحل البديل:</b> يمكنك اختيار الملف من جهازك الآن ليعمل فوراً:
+                <p class="text-xs text-red-600">
+                    تعذر الوصول لملفات البيانات. يرجى التحقق من رفع الملفات الصحيحة (lands.geojson) في المستودع.
                 </p>
-                
-                <!-- زر الرفع اليدوي للطوارئ -->
-                <label class="block w-full cursor-pointer">
-                    <span class="sr-only">اختر ملف الأراضي</span>
-                    <input type="file" id="manualUpload" accept=".geojson,.json" class="block w-full text-xs text-slate-500
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-full file:border-0
-                        file:text-xs file:font-semibold
-                        file:bg-red-100 file:text-red-700
-                        hover:file:bg-red-200
-                    "/>
-                </label>
             </div>
 
             <!-- بطاقة الفلترة -->
@@ -209,7 +196,6 @@
         // ==========================================
         // 1. إعدادات البيانات (القريات)
         // ==========================================
-        // استخدام أسماء الملفات مباشرة لتوافق أفضل
         const FILES = {
             lands: 'lands.geojson',   
             urban: 'urban.geojson',   
@@ -250,79 +236,47 @@
 
         async function init() {
             try {
-                // 1. جلب ملف الأراضي
+                // محاولة جلب ملف الأراضي
                 const response = await fetch(FILES.lands);
                 if (!response.ok) {
-                    throw new Error(`HTTP Status ${response.status}`);
+                    throw new Error(`HTTP Error: ${response.status}`);
                 }
                 landsData = await response.json();
                 
-                // نجاح التحميل
+                // نجاح التحميل (بيئة GitHub)
                 showToast(`تم تحميل البيانات بنجاح`, "success");
                 document.getElementById('data-status').innerHTML = '<span class="text-green-600 font-bold"><i class="fa-solid fa-check"></i> متصل بالخادم (Live)</span>';
-                document.getElementById('error-section').classList.add('hidden');
+                document.getElementById('error-msg').classList.add('hidden');
 
-                // 2. محاولة جلب باقي الملفات
+                // جلب باقي الملفات بشكل صامت
                 try { const uRes = await fetch(FILES.urban); if(uRes.ok) urbanData = await uRes.json(); } catch(e) {}
                 try { const dRes = await fetch(FILES.dev); if(dRes.ok) devData = await dRes.json(); } catch(e) {}
 
             } catch (error) {
-                // التحقق مما إذا كان الخطأ بسبب بيئة المعاينة (Sandbox/Blob URL)
-                if (error.message && error.message.includes("Failed to parse URL")) {
-                    console.warn("جاري العمل في بيئة محلية (Sandbox) - تم تفعيل الوضع اليدوي.");
+                // التعامل الذكي مع الأخطاء (للتمييز بين بيئة المعاينة والسيرفر الحقيقي)
+                
+                if (error.message && (error.message.includes("Failed to parse URL") || error.message.includes("NetworkError"))) {
+                    // هذا الخطأ يظهر فقط في بيئة المعاينة أو التشغيل المحلي بدون سيرفر
+                    console.warn("بيئة المعاينة: لا يمكن قراءة الملفات النسبية. ستعمل عند الرفع على GitHub.");
+                    document.getElementById('data-status').innerHTML = '<span class="text-orange-500 font-bold"><i class="fa-solid fa-server"></i> بانتظار السيرفر (GitHub)</span>';
+                    showToast(`تنبيه: البيانات ستظهر عند الرفع على GitHub`, "info");
                 } else {
-                    console.error("خطأ في جلب البيانات:", error);
+                    // خطأ حقيقي (مثل الملف غير موجود 404)
+                    console.error("فشل التحميل من المستودع:", error);
+                    showToast(`خطأ في الاتصال بقاعدة البيانات`, "warning");
+                    document.getElementById('data-status').innerHTML = '<span class="text-red-500 font-bold"><i class="fa-solid fa-xmark"></i> فشل الاتصال</span>';
+                    document.getElementById('error-msg').classList.remove('hidden');
                 }
                 
-                showToast(`تعذر العثور على ملف البيانات، يرجى الرفع اليدوي`, "warning");
-                document.getElementById('data-status').innerHTML = '<span class="text-red-500 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> وضع الرفع اليدوي</span>';
-                
-                // إظهار قسم الرفع اليدوي
-                document.getElementById('error-section').classList.remove('hidden'); 
-                
             } finally {
-                // رسم ما تم تحميله (حتى لو فارغ)
                 renderLayers();
                 populateAttributes();
                 if(landsData) updateCount(landsData.features.length);
                 
-                // إخفاء شاشة التحميل
                 document.getElementById('loading-screen').style.opacity = '0';
                 setTimeout(() => { document.getElementById('loading-screen').style.display = 'none'; }, 500);
             }
         }
-
-        // ==========================================
-        // وظائف الرفع اليدوي (Fallback)
-        // ==========================================
-        document.getElementById('manualUpload').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    landsData = JSON.parse(e.target.result);
-                    
-                    // إعادة تهيئة الواجهة
-                    document.getElementById('error-section').classList.add('hidden');
-                    document.getElementById('data-status').innerHTML = '<span class="text-blue-600 font-bold"><i class="fa-solid fa-file-arrow-up"></i> ملف محلي</span>';
-                    showToast("تم تحميل الملف يدوياً بنجاح", "success");
-                    
-                    renderLayers();
-                    populateAttributes();
-                    updateCount(landsData.features.length);
-                    
-                    // تحريك الكاميرا
-                    const bounds = L.geoJSON(landsData).getBounds();
-                    if (bounds.isValid()) map.fitBounds(bounds);
-
-                } catch (err) {
-                    alert("الملف المختار ليس ملف GeoJSON صالح.");
-                }
-            };
-            reader.readAsText(file);
-        });
 
         // ==========================================
         // 4. وظائف العرض والتحكم
@@ -333,7 +287,6 @@
                 layers.lands.clearLayers();
                 
                 L.geoJSON(landsData, {
-                    // تحويل النقاط إلى دوائر
                     pointToLayer: function (feature, latlng) {
                         return L.circleMarker(latlng, {
                             radius: 6,
