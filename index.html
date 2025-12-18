@@ -263,7 +263,7 @@
             } finally {
                 renderLayers();
                 
-                // تهيئة الفلاتر: إضافة صف واحد افتراضي
+                // تهيئة الفلاتر
                 if (landsData) {
                     addFilterRow();
                     updateCount(landsData.features.length);
@@ -275,7 +275,7 @@
         }
 
         // ==========================================
-        // 4. منطق الفلترة المتقدمة (متعددة المعايير)
+        // 4. منطق الفلترة المتقدمة (متعددة المعايير والرقمية)
         // ==========================================
 
         const filtersContainer = document.getElementById('filters-container');
@@ -286,18 +286,20 @@
 
             const rowId = 'filter-row-' + Date.now();
             const row = document.createElement('div');
-            row.className = 'filter-row flex gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-200';
+            row.className = 'filter-row flex gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-200 flex-wrap';
             row.id = rowId;
 
+            // بناء الصف الأساسي
             row.innerHTML = `
-                <div class="flex-1">
+                <div class="w-full sm:w-1/3">
                     <select class="filter-attr w-full bg-white border border-slate-300 text-slate-700 text-xs rounded focus:ring-blue-500 focus:border-blue-500 p-2" onchange="handleAttrChange('${rowId}')">
                         <option value="">-- اختر الحقل --</option>
                     </select>
                 </div>
-                <div class="flex-1">
-                    <select class="filter-val w-full bg-white border border-slate-300 text-slate-700 text-xs rounded focus:ring-blue-500 focus:border-blue-500 p-2 disabled:bg-slate-100 disabled:text-slate-400" disabled onchange="applyMultiFilters()">
-                        <option value="">-- الكل --</option>
+                <div class="filter-values-container flex-1 flex gap-2">
+                    <!-- سيتم تعبئة هذا الجزء ديناميكياً (قائمة أو حقول رقمية) -->
+                    <select class="filter-val w-full bg-white border border-slate-300 text-slate-700 text-xs rounded focus:ring-blue-500 focus:border-blue-500 p-2 disabled:bg-slate-100" disabled>
+                        <option value="">-- القيمة --</option>
                     </select>
                 </div>
                 <button onclick="removeFilterRow('${rowId}')" class="text-slate-400 hover:text-red-500 transition px-1" title="حذف">
@@ -314,29 +316,23 @@
             const row = document.getElementById(rowId);
             if(row) {
                 row.remove();
-                applyMultiFilters(); // إعادة تطبيق الفلاتر المتبقية
+                applyMultiFilters(); 
             }
-            // إذا لم يبق أي فلتر، أضف واحداً فارغاً
-            if (filtersContainer.children.length === 0) {
-                addFilterRow();
-            }
+            if (filtersContainer.children.length === 0) addFilterRow();
         };
 
-        // زر إضافة معيار
+        // الأزرار
         document.getElementById('addFilterBtn').addEventListener('click', addFilterRow);
-
-        // زر مسح الكل
         document.getElementById('resetBtn').addEventListener('click', () => {
             filtersContainer.innerHTML = '';
             addFilterRow();
             applyMultiFilters();
         });
 
-        // تعبئة قائمة الحقول (Attributes)
+        // تعبئة الحقول
         function populateAttributes(selectElement) {
             const keys = Object.keys(landsData.features[0].properties);
             keys.sort().forEach(key => {
-                 // استبعاد حقلي X و Y والحقول التقنية الأخرى
                  if(key !== 'OBJECTID' && key !== 'Shape' && key !== 'GlobalID' && key !== 'Shape_Length' && key !== 'Shape_Area' && key !== 'X' && key !== 'Y') {
                     const opt = document.createElement('option');
                     opt.value = key;
@@ -346,63 +342,134 @@
             });
         }
 
-        // عند تغيير الحقل -> تعبئة القيم المتاحة
+        // فحص هل الحقل رقمي (مثل المساحة)
+        function isNumericField(attrName, sampleVal) {
+            // تحقق من الاسم
+            if (attrName.includes("المساحة") || attrName.includes("Area")) return true;
+            // تحقق من القيمة
+            return !isNaN(parseFloat(sampleVal)) && isFinite(sampleVal);
+        }
+
+        // معالجة تغيير الحقل المختار
         window.handleAttrChange = function(rowId) {
             const row = document.getElementById(rowId);
             const attrSelect = row.querySelector('.filter-attr');
-            const valSelect = row.querySelector('.filter-val');
+            const container = row.querySelector('.filter-values-container');
             const attr = attrSelect.value;
 
-            valSelect.innerHTML = '<option value="">-- الكل --</option>';
-            
             if (!attr) {
-                valSelect.disabled = true;
-                applyMultiFilters(); // تحديث الخريطة
+                container.innerHTML = `<select class="filter-val w-full bg-white border border-slate-300 text-slate-700 text-xs rounded p-2" disabled><option>-- القيمة --</option></select>`;
+                applyMultiFilters();
                 return;
             }
-            valSelect.disabled = false;
 
-            // استخراج القيم الفريدة لهذا الحقل
-            const uniqueValues = new Set();
-            landsData.features.forEach(f => {
-                if (f.properties[attr] !== undefined && f.properties[attr] !== null) {
-                    uniqueValues.add(f.properties[attr]);
-                }
-            });
-            
-            const sortedValues = Array.from(uniqueValues).sort();
-            sortedValues.forEach(val => {
-                const opt = document.createElement('option');
-                opt.value = val;
-                opt.innerText = val;
-                valSelect.appendChild(opt);
-            });
-            
-            // تطبيق الفلتر فوراً (سيعتبر القيمة "الكل" حالياً)
+            // فحص نوع البيانات (من أول عنصر يحتوي على هذا الحقل)
+            const sampleFeature = landsData.features.find(f => f.properties[attr] != null);
+            const isNumeric = sampleFeature && isNumericField(attr, sampleFeature.properties[attr]);
+
+            if (isNumeric) {
+                // وضع الواجهة الرقمية (مشغل + مدخلات)
+                container.innerHTML = `
+                    <select class="filter-op w-1/3 bg-white border border-slate-300 text-slate-700 text-xs rounded focus:ring-blue-500 p-2" onchange="handleOpChange('${rowId}')">
+                        <option value="eq">يساوي (=)</option>
+                        <option value="gt">أكبر من (>)</option>
+                        <option value="lt">أصغر من (<)</option>
+                        <option value="bt">بين قيمتين (..)</option>
+                    </select>
+                    <input type="number" class="filter-num-1 flex-1 bg-white border border-slate-300 text-slate-700 text-xs rounded focus:ring-blue-500 p-2" placeholder="القيمة" oninput="applyMultiFilters()">
+                    <input type="number" class="filter-num-2 flex-1 bg-white border border-slate-300 text-slate-700 text-xs rounded focus:ring-blue-500 p-2 hidden" placeholder="إلى" oninput="applyMultiFilters()">
+                `;
+            } else {
+                // وضع القائمة النصية العادية
+                container.innerHTML = `
+                    <select class="filter-val w-full bg-white border border-slate-300 text-slate-700 text-xs rounded focus:ring-blue-500 p-2" onchange="applyMultiFilters()">
+                        <option value="">-- الكل --</option>
+                    </select>
+                `;
+                
+                // تعبئة القيم الفريدة
+                const valSelect = container.querySelector('.filter-val');
+                const uniqueValues = new Set();
+                landsData.features.forEach(f => {
+                    if (f.properties[attr] != null) uniqueValues.add(f.properties[attr]);
+                });
+                
+                const sortedValues = Array.from(uniqueValues).sort();
+                sortedValues.forEach(val => {
+                    const opt = document.createElement('option');
+                    opt.value = val;
+                    opt.innerText = val;
+                    valSelect.appendChild(opt);
+                });
+            }
             applyMultiFilters();
         };
 
-        // الدالة الرئيسية: تطبيق جميع الفلاتر (AND Logic)
+        // معالجة تغيير المشغل الرقمي (إظهار حقل "إلى" عند اختيار "بين")
+        window.handleOpChange = function(rowId) {
+            const row = document.getElementById(rowId);
+            const op = row.querySelector('.filter-op').value;
+            const input2 = row.querySelector('.filter-num-2');
+            
+            if (op === 'bt') {
+                input2.classList.remove('hidden');
+                row.querySelector('.filter-num-1').placeholder = "من";
+            } else {
+                input2.classList.add('hidden');
+                row.querySelector('.filter-num-1').placeholder = "القيمة";
+            }
+            applyMultiFilters();
+        };
+
+        // تطبيق الفلتر (المنطق الرئيسي)
         window.applyMultiFilters = function() {
             if (!landsData) return;
 
-            // جمع كل معايير الفلترة الحالية
-            const criteria = [];
+            // جمع المعايير
             const rows = filtersContainer.querySelectorAll('.filter-row');
-            
+            const criteria = [];
+
             rows.forEach(row => {
                 const attr = row.querySelector('.filter-attr').value;
-                const val = row.querySelector('.filter-val').value;
-                if (attr && val !== "") {
-                    criteria.push({ attr: attr, val: val });
+                if (!attr) return;
+
+                // هل هو فلتر رقمي أم نصي؟
+                const isNumeric = row.querySelector('.filter-op') !== null;
+
+                if (isNumeric) {
+                    const op = row.querySelector('.filter-op').value;
+                    const val1 = parseFloat(row.querySelector('.filter-num-1').value);
+                    const val2 = parseFloat(row.querySelector('.filter-num-2').value);
+                    
+                    if (!isNaN(val1)) {
+                        criteria.push({ type: 'numeric', attr, op, val1, val2 });
+                    }
+                } else {
+                    const val = row.querySelector('.filter-val').value;
+                    if (val !== "") {
+                        criteria.push({ type: 'text', attr, val });
+                    }
                 }
             });
 
-            // تصفية البيانات
+            // تنفيذ التصفية
             const filteredFeatures = landsData.features.filter(feature => {
-                // يجب أن يحقق العنصر *جميع* الشروط (AND)
-                return criteria.every(criterion => {
-                    return String(feature.properties[criterion.attr]) === String(criterion.val);
+                return criteria.every(crit => {
+                    const propVal = feature.properties[crit.attr];
+
+                    if (crit.type === 'text') {
+                        return String(propVal) === String(crit.val);
+                    } 
+                    else if (crit.type === 'numeric') {
+                        const numVal = parseFloat(propVal);
+                        if (isNaN(numVal)) return false; // تجاهل القيم غير الرقمية
+
+                        if (crit.op === 'eq') return numVal === crit.val1;
+                        if (crit.op === 'gt') return numVal > crit.val1;
+                        if (crit.op === 'lt') return numVal < crit.val1;
+                        if (crit.op === 'bt') return numVal >= crit.val1 && numVal <= (isNaN(crit.val2) ? crit.val1 : crit.val2);
+                        return true;
+                    }
                 });
             });
 
@@ -422,7 +489,7 @@
                 onEachFeature: (feature, layer) => {
                      let content = `<div class="bg-blue-600 text-white p-3 font-bold text-sm">بيانات الأرض</div><div class="p-3 bg-white text-sm max-h-60 overflow-y-auto">`;
                     for (const [key, v] of Object.entries(feature.properties)) {
-                        if(key === 'OBJECTID' || key === 'Shape_Length' || key === 'Shape_Area') continue;
+                        if(key === 'OBJECTID' || key === 'Shape_Length' || key === 'Shape_Area' || key === 'Shape') continue;
                         content += `<div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-500">${key}</span><span class="text-gray-800 font-bold">${v}</span></div>`;
                     }
                     content += `</div>`;
@@ -439,7 +506,6 @@
 
         function renderLayers() {
             if(landsData) {
-                // رسم مبدئي (سيتم تحديثه بواسطة الفلتر)
                 applyMultiFilters(); 
                 try {
                     const bounds = L.geoJSON(landsData).getBounds();
@@ -449,7 +515,6 @@
 
             if(urbanData) {
                 layers.urban.clearLayers();
-                // إضافة دعم للنقاط في حال كانت البيانات نقطية
                 L.geoJSON(urbanData, { 
                     style: styles.urban,
                     pointToLayer: function (feature, latlng) {
@@ -459,7 +524,6 @@
             }
             if(devData) {
                 layers.dev.clearLayers();
-                // إضافة دعم للنقاط في حال كانت البيانات نقطية
                 L.geoJSON(devData, { 
                     style: styles.dev,
                     pointToLayer: function (feature, latlng) {
