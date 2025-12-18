@@ -336,7 +336,8 @@
         function populateAttributes(selectElement) {
             const keys = Object.keys(landsData.features[0].properties);
             keys.sort().forEach(key => {
-                 if(key !== 'OBJECTID' && key !== 'Shape' && key !== 'GlobalID' && key !== 'Shape_Length' && key !== 'Shape_Area') {
+                 // استبعاد حقلي X و Y والحقول التقنية الأخرى
+                 if(key !== 'OBJECTID' && key !== 'Shape' && key !== 'GlobalID' && key !== 'Shape_Length' && key !== 'Shape_Area' && key !== 'X' && key !== 'Y') {
                     const opt = document.createElement('option');
                     opt.value = key;
                     opt.innerText = key;
@@ -448,11 +449,23 @@
 
             if(urbanData) {
                 layers.urban.clearLayers();
-                L.geoJSON(urbanData, { style: styles.urban }).addTo(layers.urban);
+                // إضافة دعم للنقاط في حال كانت البيانات نقطية
+                L.geoJSON(urbanData, { 
+                    style: styles.urban,
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, { radius: 5, fillColor: "#ea580c", color: "#fff", weight: 1, opacity: 1, fillOpacity: 0.8 });
+                    }
+                }).addTo(layers.urban);
             }
             if(devData) {
                 layers.dev.clearLayers();
-                L.geoJSON(devData, { style: styles.dev }).addTo(layers.dev);
+                // إضافة دعم للنقاط في حال كانت البيانات نقطية
+                L.geoJSON(devData, { 
+                    style: styles.dev,
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, { radius: 5, fillColor: "#16a34a", color: "#fff", weight: 1, opacity: 1, fillOpacity: 0.8 });
+                    }
+                }).addTo(layers.dev);
             }
         }
 
